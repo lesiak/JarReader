@@ -1,16 +1,13 @@
 package com.lesiak.utils;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import com.google.common.io.ByteStreams;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.*;
 import java.net.URL;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Reading files from jar file URL, taking care of nested jar
@@ -48,39 +45,14 @@ public class JarReader {
             while ((jarEntry = jarInputStream.getNextEntry()) != null) {
                 String jarEntryName = "/" + jarEntry.getName();
                 if (!jarEntry.isDirectory() && jarEntryName.startsWith(paths[i])) {
-                    byte[] byteArray = copyStream(jarInputStream, jarEntry);
-                    logger.debug("Entry {} with size {} and data size {}", jarEntryName, jarEntry.getSize(), byteArray.length);
-                    readStream(new ByteArrayInputStream(byteArray), jarEntryName, i + 1, paths, callback);
+                    InputStream jarEntryStream = ByteStreams.limit(jarInputStream, jarEntry.getSize());
+                    logger.debug("Entry {} with size {} and data size {}", jarEntryName, jarEntry.getSize(), jarEntry.getSize());
+                    readStream(jarEntryStream, jarEntryName, i + 1, paths, callback);
                 }
             }
         } finally {
             jarInputStream.close();
         }
-    }
-
-    private static byte[] copyStream(InputStream in, ZipEntry entry)
-            throws IOException {
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        long size = entry.getSize();
-        if (size > -1) {
-            byte[] buffer = new byte[1024 * 4];
-            int n = 0;
-            long count = 0;
-            while (-1 != (n = in.read(buffer)) && count < size) {
-                baos.write(buffer, 0, n);
-                count += n;
-            }
-        } else {
-            while (true) {
-                int b = in.read();
-                if (b == -1) {
-                    break;
-                }
-                baos.write(b);
-            }
-        }
-        baos.close();
-        return baos.toByteArray();
     }
 
     public static interface InputStreamCallback {
