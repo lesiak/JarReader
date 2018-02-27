@@ -37,15 +37,15 @@ public class JarReader {
 
     private static void readStream(InputStream jarFileInputStream, int pathSegmentToOpen, String[] pathSegments, InputStreamCallback callback) throws IOException {
         boolean isInsideInnermostJar = pathSegmentToOpen == pathSegments.length - 1;
+        String pathSegmentWithoutLeadingSlash = pathSegments[pathSegmentToOpen].substring(1);
         ZipInputStream jarInputStream = new ZipInputStream(jarFileInputStream);
         ZipEntry jarEntry = null;
         while ((jarEntry = jarInputStream.getNextEntry()) != null) {
-            String jarEntryName = "/" + jarEntry.getName();
-            if (!jarEntry.isDirectory() && jarEntryName.startsWith(pathSegments[pathSegmentToOpen])) {
-                logger.debug("Entry {} with size {} and data size {}", jarEntryName, jarEntry.getSize(), jarEntry.getSize());
+            if (!jarEntry.isDirectory() && jarEntry.getName().startsWith(pathSegmentWithoutLeadingSlash)) {
+                logger.debug("Entry {} with size {} and data size {}", jarEntry.getName(), jarEntry.getSize(), jarEntry.getSize());
                 InputStream jarEntryStream = ByteStreams.limit(jarInputStream, jarEntry.getSize());
                 if (isInsideInnermostJar) {
-                    callback.onFile(jarEntryName, jarFileInputStream);
+                    callback.onFile(jarEntry.getName(), jarFileInputStream);
 
                 } else {
                     readStream(jarEntryStream, pathSegmentToOpen + 1, pathSegments, callback);
