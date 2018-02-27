@@ -21,16 +21,16 @@ public class JarReader {
     private static final Logger logger =
             LoggerFactory.getLogger(JarReader.class);
 
-    public static void read(URL jarUrl, InputStreamCallback callback) throws IOException {
-        if (!"jar".equals(jarUrl.getProtocol())) {
-            throw new IllegalArgumentException("Jar protocol is expected but get " + jarUrl.getProtocol());
+    public static void read(URL dirUrl, InputStreamCallback callback) throws IOException {
+        if (!"jar".equals(dirUrl.getProtocol())) {
+            throw new IllegalArgumentException("Jar protocol is expected but get " + dirUrl.getProtocol());
         }
         if (callback == null) {
             throw new IllegalArgumentException("Callback must not be null");
         }
-        String jarPath = jarUrl.getPath().substring(5);
-        String[] pathSegments = jarPath.split("!");
-        try (FileInputStream jarFileInputStream = new FileInputStream(pathSegments[0])) {
+        String[] pathSegments = dirUrl.getPath().split("!");
+        URL jarUrl = new URL(pathSegments[0]);
+        try (InputStream jarFileInputStream = jarUrl.openStream()) {
             readStream(jarFileInputStream, 1, pathSegments, callback);
         }
     }
