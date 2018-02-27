@@ -34,8 +34,8 @@ public class JarReader {
         readStream(jarFileInputStream, paths[0], 1, paths, callback);
     }
 
-    private static void readStream(InputStream jarFileInputStream, String name, int i, String[] paths, InputStreamCallback callback) throws IOException {
-        if (i == paths.length) {
+    private static void readStream(InputStream jarFileInputStream, String name, int pathSegmentToOpen, String[] paths, InputStreamCallback callback) throws IOException {
+        if (pathSegmentToOpen == paths.length) {
             callback.onFile(name, jarFileInputStream);
             return;
         }
@@ -44,10 +44,10 @@ public class JarReader {
             ZipEntry jarEntry = null;
             while ((jarEntry = jarInputStream.getNextEntry()) != null) {
                 String jarEntryName = "/" + jarEntry.getName();
-                if (!jarEntry.isDirectory() && jarEntryName.startsWith(paths[i])) {
+                if (!jarEntry.isDirectory() && jarEntryName.startsWith(paths[pathSegmentToOpen])) {
                     InputStream jarEntryStream = ByteStreams.limit(jarInputStream, jarEntry.getSize());
                     logger.debug("Entry {} with size {} and data size {}", jarEntryName, jarEntry.getSize(), jarEntry.getSize());
-                    readStream(jarEntryStream, jarEntryName, i + 1, paths, callback);
+                    readStream(jarEntryStream, jarEntryName, pathSegmentToOpen + 1, paths, callback);
                 }
             }
         } finally {
