@@ -21,7 +21,7 @@ public class JarReader {
     private static final Logger logger =
             LoggerFactory.getLogger(JarReader.class);
 
-    public static void read(URL dirUrl, JarEntryCallback callback) throws IOException {
+    public static void read(URL dirUrl, JarEntryNameAndStreamCallback callback) throws IOException {
         if (!"jar".equals(dirUrl.getProtocol())) {
             throw new IllegalArgumentException("Jar protocol is expected but get " + dirUrl.getProtocol());
         }
@@ -49,26 +49,19 @@ public class JarReader {
         }
     }
 
-    private static void readStream(InputStream jarFileInputStream, int pathSegmentToOpen, String[] pathSegments, JarEntryCallback callback) throws IOException {
-        boolean isInsideInnermostJar = pathSegmentToOpen == pathSegments.length - 1;
-        String pathSegmentWithoutLeadingSlash = pathSegments[pathSegmentToOpen].substring(1);
-        ZipInputStream jarInputStream = new ZipInputStream(jarFileInputStream);
-        ZipEntry jarEntry = null;
-        while ((jarEntry = jarInputStream.getNextEntry()) != null) {
-            if (!jarEntry.isDirectory() && jarEntry.getName().startsWith(pathSegmentWithoutLeadingSlash)) {
-                logger.debug("Entry {} with size {} and data size {}", jarEntry.getName(), jarEntry.getSize(), jarEntry.getSize());
-                InputStream jarEntryStream = ByteStreams.limit(jarInputStream, jarEntry.getSize());
-                if (isInsideInnermostJar) {
-                    callback.onFile(jarEntry.getName(), jarFileInputStream);
-
-                } else {
-                    readStream(jarEntryStream, pathSegmentToOpen + 1, pathSegments, callback);
-                }
-            }
-        }
+    private static void readStream(InputStream jarFileInputStream, int pathSegmentToOpen, String[] pathSegments, JarEntryNameCallback callback) throws IOException {
+        readStream(jarFileInputStream, pathSegmentToOpen, pathSegments, (JarEntryHandler) (jarInputStream, jarEntry) -> callback.onFile(jarEntry.getName()));
     }
 
-    private static void readStream(InputStream jarFileInputStream, int pathSegmentToOpen, String[] pathSegments, JarEntryNameCallback callback) throws IOException {
+
+    private static void readStream(InputStream jarFileInputStream, int pathSegmentToOpen, String[] pathSegments, JarEntryNameAndStreamCallback callback) throws IOException {
+        readStream(jarFileInputStream, pathSegmentToOpen, pathSegments, (JarEntryHandler) (jarInputStream, jarEntry) -> {
+            InputStream jarEntryStream = ByteStreams.limit(jarInputStream, jarEntry.getSize());
+            callback.onFile(jarEntry.getName(), jarEntryStream);
+        });
+    }
+
+    private static void readStream(InputStream jarFileInputStream, int pathSegmentToOpen, String[] pathSegments, JarEntryHandler entryHandler) throws IOException {
         boolean isInsideInnermostJar = pathSegmentToOpen == pathSegments.length - 1;
         String pathSegmentWithoutLeadingSlash = pathSegments[pathSegmentToOpen].substring(1);
         ZipInputStream jarInputStream = new ZipInputStream(jarFileInputStream);
@@ -77,21 +70,27 @@ public class JarReader {
             if (!jarEntry.isDirectory() && jarEntry.getName().startsWith(pathSegmentWithoutLeadingSlash)) {
                 logger.debug("Entry {} with size {} and data size {}", jarEntry.getName(), jarEntry.getSize(), jarEntry.getSize());
                 if (isInsideInnermostJar) {
-                    callback.onFile(jarEntry.getName());
+                    entryHandler.onJarEntry(jarInputStream, jarEntry);
                 } else {
                     InputStream jarEntryStream = ByteStreams.limit(jarInputStream, jarEntry.getSize());
-                    readStream(jarEntryStream, pathSegmentToOpen + 1, pathSegments, callback);
+                    readStream(jarEntryStream, pathSegmentToOpen + 1, pathSegments, entryHandler);
                 }
             }
         }
     }
 
+    @FunctionalInterface
+    public interface JarEntryHandler {
+        void onJarEntry(ZipInputStream jarInputStream, ZipEntry jarEntry) throws IOException;
+    }
 
+    @FunctionalInterface
     public interface JarEntryNameCallback {
         void onFile(String name) throws IOException;
     }
 
-    public interface JarEntryCallback {
+    @FunctionalInterface
+    public interface JarEntryNameAndStreamCallback {
         void onFile(String name, InputStream is) throws IOException;
     }
 }
